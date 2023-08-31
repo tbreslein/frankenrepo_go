@@ -5,12 +5,62 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
+
+type CommandType int
+
+const (
+	Build CommandType = iota
+	Test
+)
+
+type Command struct {
+	T         CommandType
+	CmdString string
+}
+
+type Repo struct {
+	Pkgs []Pkg
+}
+
+type Pkg struct {
+	Name string
+	// cmds map[CommandType][]command
+}
+
+func ParseManifest(manifestDir string) Repo {
+	manifestBytes, err := os.ReadFile(filepath.Join(manifestDir, "frankenfest.yaml"))
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	repo := Repo{}
+	err = yaml.Unmarshal(manifestBytes, &repo)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	return repo
+}
+
+func processPkgsArgs(args []string) []string {
+	var packageList []string
+	if len(args) == 0 {
+		packageList = append(packageList, "all")
+	} else {
+		packageList = args
+	}
+	for _, a := range packageList {
+		fmt.Println(a)
+	}
+	return packageList
+}
 
 // rootCmd represents the base command when called without any subcommands
 var (
@@ -31,15 +81,23 @@ var (
 		Use:   "build",
 		Short: "run build on package(s)",
 		Run: func(cmd *cobra.Command, args []string) {
-			var packageList []string
-			if len(args) == 0 {
-				packageList = append(packageList, "all")
-			} else {
-				packageList = args
-			}
-			for _, a := range packageList {
-				fmt.Println(a)
-			}
+			packageList := processPkgsArgs(args)
+			repo := ParseManifest(workingDir)
+
+			fmt.Println(packageList)
+			fmt.Println(repo)
+		},
+	}
+
+	testCmd = &cobra.Command{
+		Use:   "test",
+		Short: "run test on package(s)",
+		Run: func(cmd *cobra.Command, args []string) {
+			packageList := processPkgsArgs(args)
+			repo := ParseManifest(workingDir)
+
+			fmt.Println(packageList)
+			fmt.Println(repo)
 		},
 	}
 )
@@ -64,6 +122,7 @@ func init() {
 		"runs frankenrepo with this path as the CWD",
 	)
 	rootCmd.AddCommand(buildCmd)
+	rootCmd.AddCommand(testCmd)
 }
 
 func initConfig() {
