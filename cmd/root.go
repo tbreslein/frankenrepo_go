@@ -19,6 +19,9 @@ type CommandType int
 const (
 	Build CommandType = iota
 	Test
+	Format
+	Lint
+	Run
 )
 
 type Command struct {
