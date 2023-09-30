@@ -4,3 +4,4 @@ tasks:
   build: go build {{.CLI_ARGS}} .
   run: go run . {{.CLI_ARGS}}
   test: go test {{.CLI_ARGS}} ./...
+  debug: dlv debug -- {{.CLI_ARGS}}
