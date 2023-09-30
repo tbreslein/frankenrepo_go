@@ -1,7 +1,7 @@
 version = 2
 
 [[pkgs]]
-name = cproj
+name = "cproj"
 
 [[pkgs]]
-name = rustproj
+name = "rustproj"
