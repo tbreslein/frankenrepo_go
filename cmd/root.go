@@ -4,14 +4,15 @@ Copyright © 2023 Tommy Breslein <github.com/tbreslein>
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 )
 
 type CommandType int
@@ -24,13 +25,19 @@ const (
 	Run
 )
 
+const (
+	ProjectManifestName = "frankenfest.toml"
+	ConfigFile          = "frankenrepo.toml"
+)
+
 type Command struct {
 	T         CommandType
 	CmdString string
 }
 
-type Repo struct {
-	Pkgs []Pkg
+type Manifest struct {
+	Version int
+	Pkgs    []Pkg
 }
 
 type Pkg struct {
@@ -38,18 +45,25 @@ type Pkg struct {
 	// cmds map[CommandType][]command
 }
 
-func ParseManifest(manifestDir string) Repo {
-	manifestBytes, err := os.ReadFile(filepath.Join(manifestDir, "frankenfest.yaml"))
+func ParseManifest(manifestDir string) Manifest {
+	manifestPath := filepath.Join(manifestDir, ProjectManifestName)
+	manifestBytes, err := os.ReadFile(manifestPath)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	repo := Repo{}
-	err = yaml.Unmarshal(manifestBytes, &repo)
-	if err != nil {
-		log.Fatalln(err)
+	manifest := Manifest{}
+	err = toml.Unmarshal(manifestBytes, &manifest)
+	var derr *toml.DecodeError
+	if errors.As(err, &derr) {
+		row, col := derr.Position()
+		log.Fatal(
+			"PARSING ERROR:: ",
+			manifestPath, ":", row, ":", col,
+			"\n", derr.String(),
+		)
 	}
-	return repo
+	return manifest
 }
 
 func processPkgsArgs(args []string) []string {
@@ -59,9 +73,11 @@ func processPkgsArgs(args []string) []string {
 	} else {
 		packageList = args
 	}
+	fmt.Print("Running frankenrepo on these packages: ")
 	for _, a := range packageList {
-		fmt.Println(a)
+		fmt.Print(a)
 	}
+	fmt.Println("")
 	return packageList
 }
 
@@ -111,19 +127,22 @@ func Execute() error {
 
 func init() {
 	cobra.OnInitialize(initConfig)
+
 	rootCmd.PersistentFlags().StringVar(
 		&cfgFile,
 		"config",
 		"",
-		"config file (default at $HOME/{,.config,.config/frankenrepo}.frankenrepo.yaml)",
+		"config file"+
+			" (default at $HOME/{,.config,.config/frankenrepo}/"+ConfigFile+")",
 	)
 	rootCmd.PersistentFlags().StringVarP(
 		&workingDir,
-		"working directory",
+		"working-directory",
 		"C",
 		".",
 		"runs frankenrepo with this path as the CWD",
 	)
+
 	rootCmd.AddCommand(buildCmd)
 	rootCmd.AddCommand(testCmd)
 }
@@ -138,14 +157,12 @@ func initConfig() {
 		viper.AddConfigPath(home)
 		viper.AddConfigPath(filepath.Join(home, ".config"))
 		viper.AddConfigPath(filepath.Join(home, ".config", "frankenrepo"))
-		viper.SetConfigType("yaml")
+		viper.SetConfigType("toml")
 		viper.SetConfigName("frankenrepo")
 	}
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file: ", viper.ConfigFileUsed())
-	} else {
-		println("no config file found")
 	}
 }

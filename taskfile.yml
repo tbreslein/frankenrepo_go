@@ -1,6 +1,6 @@
 ---
 version: 3
 tasks:
-  build: go build .
-  run: go run .
-  test: go test ./...
+  build: go build {{.CLI_ARGS}} .
+  run: go run . {{.CLI_ARGS}}
+  test: go test {{.CLI_ARGS}} ./...

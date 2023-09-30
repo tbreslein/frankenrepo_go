@@ -1,0 +1,7 @@
+version = 2
+
+[[pkgs]]
+name = cproj
+
+[[pkgs]]
+name = rustproj
