@@ -8,12 +8,22 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+)
+
+type FrankenError string
+
+const (
+	CommandError      = "COMMAND_ERROR"
+	ParsingError      = "PARSING_ERROR"
+	MissingFieldError = "MISSING_FIELD_ERROR"
+	UnknownError      = "UNKNOWN_ERROR"
 )
 
 type CommandType int
@@ -73,17 +83,17 @@ func ParseFrankenfest(frankenfestDir string) Frankenfest {
 		if errors.As(err, &decode_err) {
 			row, col := decode_err.Position()
 			log.Fatal(
-				"PARSING_ERROR:: ", frankenfestPath, ":", row, ":", col, "\n",
+				ParsingError+":: ", frankenfestPath, ":", row, ":", col, "\n",
 				decode_err.String(),
 			)
 		} else if errors.As(err, &smissing_err) {
 			log.Fatal(
-				"MISSING_FIELD ERROR:: ", frankenfestPath, "\n",
+				MissingFieldError+":: ", frankenfestPath, "\n",
 				smissing_err.String(),
 			)
 		} else {
 			log.Fatal(
-				"UNKNOWN_ERROR:: ", frankenfestPath, "\n",
+				UnknownError+":: ", frankenfestPath, "\n",
 				err,
 			)
 		}
@@ -133,11 +143,50 @@ var (
 		Use:   "test",
 		Short: "run test on package(s)",
 		Run: func(cmd *cobra.Command, args []string) {
+			// TODO: check deps
+			// TODO: extract processPkgsArgs and ParseFrankenfest into one func
 			packageList := processPkgsArgs(args)
 			repo := ParseFrankenfest(workingDir)
 
-			fmt.Println(packageList)
-			fmt.Println(repo)
+			if len(packageList) == 1 && packageList[0] == "all" {
+				// TODO: dependency check ++ build those dependencies!
+				for _, r := range repo.Pkgs {
+					if len(r.Depends) > 0 {
+						for _, dep := range r.Depends {
+							// TODO: this needs to run recursively
+							dep_idx := 0
+							for i, r2 := range repo.Pkgs {
+								if r2.Name == dep {
+									dep_idx = i
+								}
+							}
+							cmd_string := strings.Split(repo.Pkgs[dep_idx].Build[0], " ")
+							cmd := exec.Command(cmd_string[0], cmd_string[1:]...)
+							cmd.Dir = filepath.Join(workingDir, repo.Pkgs[dep_idx].Path)
+							cmd.Stdout = os.Stdout
+							cmd.Stderr = os.Stderr
+							if err := cmd.Run(); err != nil {
+								log.Fatal(CommandError+"::\n", err)
+							}
+						}
+					}
+					for _, t := range r.Test {
+						cmd_string := strings.Split(t, " ")
+						cmd := exec.Command(cmd_string[0], cmd_string[1:]...)
+						cmd.Dir = filepath.Join(workingDir, r.Path)
+						cmd.Stdout = os.Stdout
+						// capture this in a variable instead, so we can log it
+						// properly
+						cmd.Stderr = os.Stderr
+						if err := cmd.Run(); err != nil {
+							log.Fatal(CommandError+"::\n", err)
+						}
+					}
+				}
+			}
+
+			// fmt.Println(packageList)
+			// fmt.Println(repo)
 		},
 	}
 )
