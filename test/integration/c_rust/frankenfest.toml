@@ -1,7 +1,22 @@
-version = 2
+version = 1
+
+deps = [
+    "make",
+    "gcc",
+    "cargo"
+]
 
 [[pkgs]]
 name = "cproj"
+path = "exe/cproj"
+depends = [ "rustproj" ]
+build = [ "make main.out" ]
+test = [ "make runtest" ]
 
 [[pkgs]]
 name = "rustproj"
+path = "lib/rustproj"
+build = [ "cargo build -r" ]
+test = [ "cargo test" ]
+format = [ "cargo fmt" ]
+lint = [ "cargo check", "cargo clippy" ]

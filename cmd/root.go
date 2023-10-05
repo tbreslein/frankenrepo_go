@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
@@ -35,35 +36,59 @@ type Command struct {
 	CmdString string
 }
 
-type Manifest struct {
+type Frankenfest struct {
 	Version int
+	Deps    []string
 	Pkgs    []Pkg
 }
 
 type Pkg struct {
-	Name string
-	// cmds map[CommandType][]command
+	Name    string
+	Path    string
+	Depends []string
+	Build   []string
+	Test    []string
+	Format  []string
+	Lint    []string
+	// Run map[CommandType][]command
 }
 
-func ParseManifest(manifestDir string) Manifest {
-	manifestPath := filepath.Join(manifestDir, ProjectManifestName)
-	manifestBytes, err := os.ReadFile(manifestPath)
+func ParseFrankenfest(frankenfestDir string) Frankenfest {
+	frankenfestPath := filepath.Join(frankenfestDir, ProjectManifestName)
+	bytes, err := os.ReadFile(frankenfestPath)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	manifest := Manifest{}
-	err = toml.Unmarshal(manifestBytes, &manifest)
-	var derr *toml.DecodeError
-	if errors.As(err, &derr) {
-		row, col := derr.Position()
-		log.Fatal(
-			"PARSING ERROR:: ",
-			manifestPath, ":", row, ":", col,
-			"\n", derr.String(),
-		)
+	frankenfest := Frankenfest{}
+	err = toml.
+		NewDecoder(strings.NewReader(string(bytes))).
+		DisallowUnknownFields().
+		Decode(&frankenfest)
+
+	if err != nil {
+		var decode_err *toml.DecodeError
+		var smissing_err *toml.StrictMissingError
+
+		if errors.As(err, &decode_err) {
+			row, col := decode_err.Position()
+			log.Fatal(
+				"PARSING_ERROR:: ", frankenfestPath, ":", row, ":", col, "\n",
+				decode_err.String(),
+			)
+		} else if errors.As(err, &smissing_err) {
+			log.Fatal(
+				"MISSING_FIELD ERROR:: ", frankenfestPath, "\n",
+				smissing_err.String(),
+			)
+		} else {
+			log.Fatal(
+				"UNKNOWN_ERROR:: ", frankenfestPath, "\n",
+				err,
+			)
+		}
 	}
-	return manifest
+	return frankenfest
 }
 
 func processPkgsArgs(args []string) []string {
@@ -88,12 +113,8 @@ var (
 	rootCmd    = &cobra.Command{
 		Use:   "frankenrepo",
 		Short: "Tool to manage multi-language monorepos",
-		Long: `Frankenrepo is a proof-of-concept tool to show that monorepo build tools can be
-    language agnostic.`,
-
-		// Uncomment the following line if your bare application
-		// has an action associated with it:
-		// Run: func(cmd *cobra.Command, args []string) {},
+		Long: "Frankenrepo is a proof-of-concept tool to show that monorepo" +
+			"build tools can be language agnostic.",
 	}
 
 	buildCmd = &cobra.Command{
@@ -101,7 +122,7 @@ var (
 		Short: "run build on package(s)",
 		Run: func(cmd *cobra.Command, args []string) {
 			packageList := processPkgsArgs(args)
-			repo := ParseManifest(workingDir)
+			repo := ParseFrankenfest(workingDir)
 
 			fmt.Println(packageList)
 			fmt.Println(repo)
@@ -113,7 +134,7 @@ var (
 		Short: "run test on package(s)",
 		Run: func(cmd *cobra.Command, args []string) {
 			packageList := processPkgsArgs(args)
-			repo := ParseManifest(workingDir)
+			repo := ParseFrankenfest(workingDir)
 
 			fmt.Println(packageList)
 			fmt.Println(repo)
