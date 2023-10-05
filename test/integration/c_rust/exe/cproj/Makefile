@@ -1,12 +1,12 @@
 CC = gcc
-LFLAGS = -L../rustproj/target/release -lrustproj
+LFLAGS = -L../../lib/rustproj/target/release -lrustproj
 
 .PHONY = all clean runtest
 
 all: main.out test.out
 
 %.out: %.o
-	${CC} ${LFLAGS} $< -o $@ 
+	${CC} $< -o $@ ${LFLAGS}
 
 %.o: %.c
 	${CC} -c $<
