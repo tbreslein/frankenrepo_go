@@ -1,3 +1,4 @@
+build/**
 test/**/target
 *.a
 *.o
