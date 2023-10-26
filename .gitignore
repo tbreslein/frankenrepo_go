@@ -3,3 +3,4 @@ test/**/target
 *.a
 *.o
 *.out
+.direnv

@@ -6,23 +6,21 @@
   };
   outputs = { self, nixpkgs, flake-utils, ... }:
     flake-utils.lib.eachDefaultSystem (system:
-      let pkgs = nixpkgs.legacyPackages.${system};
+      let
+        pkgs = nixpkgs.legacyPackages.${system};
+        buildDeps = with pkgs; [ go ];
       in {
-        devShells.default =
-          pkgs.mkShell { nativeBuildInputs = with pkgs; [ go ]; };
+        devShells.default = pkgs.mkShell {
+          nativeBuildInputs = buildDeps
+            ++ [ pkgs.gopls pkgs.gofumpt pkgs.golangci-lint pkgs.go-task ];
+        };
 
         packages.default = pkgs.stdenv.mkDerivation {
-          nativeBuildInputs = with pkgs; [ go ];
+          nativeBuildInputs = buildDeps;
           name = "frankenrepo";
           src = ./.;
-
-          buildPhase = ''
-            go build
-          '';
-
-          installPhase = ''
-            cp ./frankenrepo $out/
-          '';
+          buildPhase = "go build";
+          installPhase = "cp ./frankenrepo $out/";
         };
       });
 }
