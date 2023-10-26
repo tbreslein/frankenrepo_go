@@ -4,23 +4,22 @@
     flake-utils.url = "github:numtide/flake-utils";
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
   };
-  outputs = { self, nixpkgs, flake-utils, ... }:
+  outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        buildDeps = with pkgs; [ go ];
+        version = "0.0.1";
       in {
         devShells.default = pkgs.mkShell {
-          nativeBuildInputs = buildDeps
-            ++ [ pkgs.gopls pkgs.gofumpt pkgs.golangci-lint pkgs.go-task ];
+          buildInputs = with pkgs; [ go gopls gofumpt golangci-lint go-task ];
         };
 
-        packages.default = pkgs.stdenv.mkDerivation {
-          nativeBuildInputs = buildDeps;
-          name = "frankenrepo";
+        packages.default = pkgs.buildGoModule {
+          pname = "frankenrepo";
+          inherit version;
           src = ./.;
-          buildPhase = "go build";
-          installPhase = "cp ./frankenrepo $out/";
+          # vendorSha256 = "0000000000000000000000000000000000000000000000000000";
+          vendorSha256 = "3tO/+Mnvl/wpS7Ro3XDIVrlYTGVM680mcC15/7ON6qM=";
         };
       });
 }
