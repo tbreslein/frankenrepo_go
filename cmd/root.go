@@ -143,53 +143,57 @@ var (
 		Use:   "test",
 		Short: "run test on package(s)",
 		Run: func(cmd *cobra.Command, args []string) {
-			// TODO: check deps
 			// TODO: extract processPkgsArgs and ParseFrankenfest into one func
 			packageList := processPkgsArgs(args)
 			repo := ParseFrankenfest(workingDir)
-
-			if len(packageList) == 1 && packageList[0] == "all" {
-				// TODO: dependency check ++ build those dependencies!
-				for _, r := range repo.Pkgs {
-					if len(r.Depends) > 0 {
-						for _, dep := range r.Depends {
-							// TODO: this needs to run recursively
-							dep_idx := 0
-							for i, r2 := range repo.Pkgs {
-								if r2.Name == dep {
-									dep_idx = i
-								}
-							}
-							cmd_string := strings.Split(repo.Pkgs[dep_idx].Build[0], " ")
-							cmd := exec.Command(cmd_string[0], cmd_string[1:]...)
-							cmd.Dir = filepath.Join(workingDir, repo.Pkgs[dep_idx].Path)
-							cmd.Stdout = os.Stdout
-							cmd.Stderr = os.Stderr
-							if err := cmd.Run(); err != nil {
-								log.Fatal(CommandError+"::\n", err)
-							}
-						}
-					}
-					for _, t := range r.Test {
-						cmd_string := strings.Split(t, " ")
-						cmd := exec.Command(cmd_string[0], cmd_string[1:]...)
-						cmd.Dir = filepath.Join(workingDir, r.Path)
-						cmd.Stdout = os.Stdout
-						// capture this in a variable instead, so we can log it
-						// properly
-						cmd.Stderr = os.Stderr
-						if err := cmd.Run(); err != nil {
-							log.Fatal(CommandError+"::\n", err)
-						}
-					}
-				}
-			}
-
-			// fmt.Println(packageList)
-			// fmt.Println(repo)
+			runTest(packageList, &repo, &workingDir)
 		},
 	}
 )
+
+func runTest(packageList []string, repo *Frankenfest, workingDir *string) {
+	// TODO: check deps
+
+	if len(packageList) == 1 && packageList[0] == "all" {
+		// TODO: dependency check ++ build those dependencies!
+		for _, r := range repo.Pkgs {
+			if len(r.Depends) > 0 {
+				for _, dep := range r.Depends {
+					// TODO: this needs to run recursively
+					dep_idx := 0
+					for i, r2 := range repo.Pkgs {
+						if r2.Name == dep {
+							dep_idx = i
+						}
+					}
+					cmd_string := strings.Split(repo.Pkgs[dep_idx].Build[0], " ")
+					cmd := exec.Command(cmd_string[0], cmd_string[1:]...)
+					cmd.Dir = filepath.Join(*workingDir, repo.Pkgs[dep_idx].Path)
+					cmd.Stdout = os.Stdout
+					cmd.Stderr = os.Stderr
+					if err := cmd.Run(); err != nil {
+						log.Fatal(CommandError+"::\n", err)
+					}
+				}
+			}
+			for _, t := range r.Test {
+				cmd_string := strings.Split(t, " ")
+				cmd := exec.Command(cmd_string[0], cmd_string[1:]...)
+				cmd.Dir = filepath.Join(*workingDir, r.Path)
+				cmd.Stdout = os.Stdout
+				// capture this in a variable instead, so we can log it
+				// properly
+				cmd.Stderr = os.Stderr
+				if err := cmd.Run(); err != nil {
+					log.Fatal(CommandError+"::\n", err)
+				}
+			}
+		}
+	}
+
+	// fmt.Println(packageList)
+	// fmt.Println(repo)
+}
 
 func Execute() error {
 	return rootCmd.Execute()
