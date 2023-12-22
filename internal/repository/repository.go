@@ -5,93 +5,102 @@ package repository
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/deckarep/golang-set/v2"
 	"github.com/pelletier/go-toml/v2"
 )
 
 type ParseError string
 
 const (
-	DecodeError       ParseError = "DECODE_ERROR"
-	MissingFieldError ParseError = "MISSING_FIELD_ERROR"
-	UnknownError      ParseError = "UNKNOWN_PARSE_ERROR"
+	decodeError       ParseError = "DECODE_ERROR"
+	missingFieldError ParseError = "MISSING_FIELD_ERROR"
+	unknownError      ParseError = "UNKNOWN_PARSE_ERROR"
 )
 
-type CommandType int
+type targetType int
 
 const (
-	Build CommandType = iota
-	Test
-	Format
-	Lint
-	Run
+	build targetType = iota
+	// test
+	// format
+	// lint
+	// run
 )
-
-type Command struct {
-	T         CommandType
-	CmdString string
-}
 
 const (
-	ProjectManifestName = "frankenfest.toml"
-	ConfigFile          = "frankenrepo.toml"
+	projectManifestName = "frankenfest.toml"
+	configFile          = "frankenrepo.toml"
 )
 
-type Frankenfest struct {
+type frankenfest struct {
 	Version int
-	pkgs    []FrankenPkg
+	pkgs    []frankenPkg
 }
 
-type FrankenPkg struct {
+type frankenPkg struct {
 	name         string
 	path         string
 	externalDeps []string
 	internalDeps []string
 	build        []string
-	test         []string
+	// test         []string
 	// format       []string
 	// lint         []string
 	// run map[CommandType][]command
 }
 
 type Repo struct {
-	ExternalDeps []string
-	Pkgs         PkgGraph
+	externalDeps mapset.Set[string]
+	targetList   []target
+	// targetGraph  TargetGraph
 }
 
-type PkgGraph struct{}
+type targetGraph struct{}
 
-type PkgGraphNode struct {
+type target struct {
 	Name       string
-	Path       string
-	BuildCmds  []exec.Cmd
-	TestCmds   []exec.Cmd
-	FormatCmds []exec.Cmd
-	LintCmds   []exec.Cmd
-	DependsOn  []*PkgGraphNode
-	DependedBy []*PkgGraphNode
+	path       string
+	cmds       []exec.Cmd
+	t          targetType
+	dependsOn  []*target
+	dependedBy []*target
+	// BuildCmds []exec.Cmd
+	// TestCmds   []exec.Cmd
+	// FormatCmds []exec.Cmd
+	// LintCmds   []exec.Cmd
+	// RunCmds   []exec.Cmd
 }
 
-func InitRepo(frankenfestDir string, args []string) Frankenfest {
-	frankenfest := initFrankenfest(frankenfestDir)
-	// targets := processPkgsArgs(args)
-	return frankenfest
+func InitRepo(frankenfestDir string, args []string) Repo {
+	repo := initFrankenfest(&frankenfestDir).toRepo()
+	// targetStrings := processPkgsArgs(args)
+	return repo
 }
 
-func initFrankenfest(frankenfestDir string) Frankenfest {
-	frankenfestPath := filepath.Join(frankenfestDir, ProjectManifestName)
+func (ff frankenfest) toRepo() Repo {
+	repo := Repo{}
+	for _, pkg := range ff.pkgs {
+		for _, dep := range pkg.externalDeps {
+			repo.externalDeps.Add(dep)
+		}
+	}
+	return repo
+}
+
+func initFrankenfest(frankenfestDir *string) frankenfest {
+	frankenfestPath := filepath.Join(*frankenfestDir, projectManifestName)
 	bytes, err := os.ReadFile(frankenfestPath)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	frankenfest := Frankenfest{}
+	frankenfest := frankenfest{}
 	err = toml.
 		NewDecoder(strings.NewReader(string(bytes))).
 		DisallowUnknownFields().
@@ -104,17 +113,17 @@ func initFrankenfest(frankenfestDir string) Frankenfest {
 		if errors.As(err, &decode_err) {
 			row, col := decode_err.Position()
 			log.Fatal(
-				DecodeError+":: ", frankenfestPath, ":", row, ":", col, "\n",
+				decodeError+":: ", frankenfestPath, ":", row, ":", col, "\n",
 				decode_err.String(),
 			)
 		} else if errors.As(err, &smissing_err) {
 			log.Fatal(
-				MissingFieldError+":: ", frankenfestPath, "\n",
+				missingFieldError+":: ", frankenfestPath, "\n",
 				smissing_err.String(),
 			)
 		} else {
 			log.Fatal(
-				UnknownError+":: ", frankenfestPath, "\n",
+				unknownError+":: ", frankenfestPath, "\n",
 				err,
 			)
 		}
@@ -123,17 +132,17 @@ func initFrankenfest(frankenfestDir string) Frankenfest {
 	return frankenfest
 }
 
-func processPkgsArgs(args []string) []string {
-	var packageList []string
-	if len(args) == 0 {
-		packageList = append(packageList, "all")
-	} else {
-		packageList = args
-	}
-	fmt.Print("Running frankenrepo on these packages: ")
-	for _, a := range packageList {
-		fmt.Print(a)
-	}
-	fmt.Println("")
-	return packageList
-}
+// func processPkgsArgs(args []string) []string {
+// 	var packageList []string
+// 	if len(args) == 0 {
+// 		packageList = append(packageList, "all")
+// 	} else {
+// 		packageList = args
+// 	}
+// 	fmt.Print("Running frankenrepo on these packages: ")
+// 	for _, a := range packageList {
+// 		fmt.Print(a)
+// 	}
+// 	fmt.Println("")
+// 	return packageList
+// }
