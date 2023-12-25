@@ -9,6 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
+	"sort"
 	"strings"
 
 	"github.com/deckarep/golang-set/v2"
@@ -31,6 +33,12 @@ const (
 	// format
 	// lint
 	// run
+)
+
+type targetPrefix string
+
+const (
+	buildNamePrefix targetPrefix = "__BUILD__"
 )
 
 const (
@@ -58,23 +66,18 @@ type frankenPkg struct {
 type Repo struct {
 	externalDeps mapset.Set[string]
 	targetList   []target
-	// targetGraph  TargetGraph
+	buildTargets []target // slice into targetList of all build targets
 }
 
-type targetGraph struct{}
+// type targetGraph struct{}
 
 type target struct {
-	Name       string
-	path       string
-	cmds       []exec.Cmd
-	t          targetType
-	dependsOn  []*target
-	dependedBy []*target
-	// BuildCmds []exec.Cmd
-	// TestCmds   []exec.Cmd
-	// FormatCmds []exec.Cmd
-	// LintCmds   []exec.Cmd
-	// RunCmds   []exec.Cmd
+	Name      string
+	path      string
+	cmds      []exec.Cmd
+	t         targetType
+	dependsOn []*target
+	depNames  []string
 }
 
 func InitRepo(frankenfestDir string, args []string) Repo {
@@ -89,7 +92,23 @@ func (ff frankenfest) toRepo() Repo {
 		for _, dep := range pkg.externalDeps {
 			repo.externalDeps.Add(dep)
 		}
+		if len(pkg.build) > 0 {
+			repo.targetList = append(
+				repo.targetList,
+				target{
+					Name:     string(buildNamePrefix) + pkg.name,
+					path:     pkg.path,
+					t:        build,
+					depNames: pkg.internalDeps,
+				},
+			)
+		}
 	}
+	// fill in dependsOn and dependedBy.
+	// add the 'all' targets, which are the special targets of each targetType
+	// other than 'run' that depend on every other target of their group.
+
+    slices.SortFunc[](repo.targetList)
 	return repo
 }
 
